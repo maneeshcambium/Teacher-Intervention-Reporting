@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -49,11 +51,15 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 export function AssignmentSummary() {
-  const { selectedTestGroupId } = useAppContext();
-  const { data: assignments, isLoading } = useAssignments(selectedTestGroupId);
+  const { selectedTestGroupId, selectedRosterId, rosters } = useAppContext();
+  const [filterByRoster, setFilterByRoster] = useState(false);
+  const effectiveRosterId = filterByRoster ? selectedRosterId : null;
+  const { data: assignments, isLoading } = useAssignments(selectedTestGroupId, effectiveRosterId);
   const deleteMutation = useDeleteAssignment();
   const [deleteTarget, setDeleteTarget] = useState<AssignmentListItem | null>(null);
   const [viewStudents, setViewStudents] = useState<AssignmentListItem | null>(null);
+
+  const selectedRosterName = rosters.find((r) => r.id === selectedRosterId)?.name ?? "Selected Roster";
 
   const handleDelete = () => {
     if (!deleteTarget) return;
@@ -72,11 +78,28 @@ export function AssignmentSummary() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <CardTitle>Active Assignments</CardTitle>
-            {assignments && assignments.length > 0 && (
-              <Badge variant="secondary">{assignments.length}</Badge>
-            )}
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-3">
+              <CardTitle>Active Assignments</CardTitle>
+              {assignments && assignments.length > 0 && (
+                <Badge variant="secondary">{assignments.length}</Badge>
+              )}
+              {filterByRoster && (
+                <Badge variant="outline" className="text-xs">
+                  {selectedRosterName}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="roster-filter" className="text-sm text-muted-foreground cursor-pointer">
+                Filter by roster
+              </Label>
+              <Switch
+                id="roster-filter"
+                checked={filterByRoster}
+                onCheckedChange={setFilterByRoster}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

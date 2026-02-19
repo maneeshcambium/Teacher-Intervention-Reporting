@@ -267,7 +267,12 @@ export function getReportingCategoriesWithStandards(): ReportingCategoryWithStan
 
 // ─── Assignments ───────────────────────────────────────────────────────────
 
-export function getAssignments(groupId: number): AssignmentListItem[] {
+export function getAssignments(groupId: number, rosterId?: number | null): AssignmentListItem[] {
+  // When a rosterId is provided, filter student counts to only students in that roster
+  const rosterFilter = rosterId
+    ? `JOIN students s ON s.id = asn.student_id AND s.roster_id = ${Number(rosterId)}`
+    : "";
+
   const rows = sqlite
     .prepare(
       `
@@ -282,10 +287,10 @@ export function getAssignments(groupId: number): AssignmentListItem[] {
          FROM assignment_standards ast
          JOIN standards std ON std.id = ast.standard_id
          WHERE ast.assignment_id = a.id) as standardCodes,
-        (SELECT COUNT(*) FROM assignment_students WHERE assignment_id = a.id) as totalStudents,
-        (SELECT COUNT(*) FROM assignment_students WHERE assignment_id = a.id AND status = 'not_started') as notStarted,
-        (SELECT COUNT(*) FROM assignment_students WHERE assignment_id = a.id AND status = 'started') as started,
-        (SELECT COUNT(*) FROM assignment_students WHERE assignment_id = a.id AND status = 'completed') as completed
+        (SELECT COUNT(*) FROM assignment_students asn ${rosterFilter} WHERE asn.assignment_id = a.id) as totalStudents,
+        (SELECT COUNT(*) FROM assignment_students asn ${rosterFilter} WHERE asn.assignment_id = a.id AND asn.status = 'not_started') as notStarted,
+        (SELECT COUNT(*) FROM assignment_students asn ${rosterFilter} WHERE asn.assignment_id = a.id AND asn.status = 'started') as started,
+        (SELECT COUNT(*) FROM assignment_students asn ${rosterFilter} WHERE asn.assignment_id = a.id AND asn.status = 'completed') as completed
       FROM assignments a
       LEFT JOIN reporting_categories rc ON rc.id = a.rc_id
       WHERE a.group_id = ?

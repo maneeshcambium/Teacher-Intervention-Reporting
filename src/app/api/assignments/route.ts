@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const groupId = searchParams.get("groupId");
+    const rosterId = searchParams.get("rosterId");
 
     if (!groupId) {
       return NextResponse.json(
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const assignments = getAssignments(Number(groupId));
+    const assignments = getAssignments(Number(groupId), rosterId ? Number(rosterId) : null);
     return NextResponse.json(assignments);
   } catch (error) {
     console.error("Failed to fetch assignments:", error);
