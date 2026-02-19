@@ -1,8 +1,8 @@
-# Phase 10 Prompt: MCP Server — Natural Language Data Access
+# Phase 10 Prompt: MCP Server & Smart Query Panel — Natural Language Data Access
 
 > **Feed this entire file to GitHub Copilot Chat or Replit Agent.**
 > **Prerequisites**: Phases 1–9 complete.
-> **Stack**: Next.js 14 App Router, TypeScript, `@modelcontextprotocol/sdk`, better-sqlite3.
+> **Stack**: Next.js 14 App Router, TypeScript, `@modelcontextprotocol/sdk`, better-sqlite3, shadcn/ui.
 
 ---
 
@@ -16,7 +16,12 @@ Teachers aren't data analysts. The dashboard provides charts and tables, but som
 - *"Which standards are my class weakest on?"*
 - *"List students who dropped a performance level between PM1 and PM2"*
 
-Currently, answering these questions requires navigating multiple tabs, applying filters, and mentally cross-referencing data. An MCP (Model Context Protocol) server exposes all dashboard data as **tools** that an AI assistant can call, letting teachers ask natural language questions and get direct answers.
+Currently, answering these questions requires navigating multiple tabs, applying filters, and mentally cross-referencing data.
+
+**This phase delivers two complementary solutions:**
+
+1. **MCP Server** (standalone process) — Exposes all dashboard data as **tools** that any MCP-compatible AI assistant (Claude Desktop, VS Code Copilot) can call, enabling free-form natural language queries.
+2. **Smart Query Panel** (in-app slide-over) — A no-LLM UI with **9 predefined query cards** that teachers can click to get instant analytical answers directly in the dashboard.
 
 ## Design Decision: Standalone MCP Server (Not Embedded in Next.js)
 
@@ -49,13 +54,23 @@ npm install -D tsx
 ```
 src/
 ├── mcp/
-│   ├── server.ts           # MCP server entry point
+│   ├── server.ts                # MCP server entry point
 │   └── tools/
 │       ├── roster-tools.ts      # Roster & student listing tools
 │       ├── performance-tools.ts # Performance & score query tools
 │       ├── assignment-tools.ts  # Assignment management tools
 │       ├── impact-tools.ts      # DiD impact analysis tools
-│       └── standards-tools.ts   # Standards analysis tools
+│       ├── standards-tools.ts   # Standards analysis tools
+│       └── analytics-tools.ts   # Natural language query tool
+├── app/
+│   └── api/
+│       └── ask/
+│           └── route.ts         # In-app Smart Query Panel API (POST)
+├── components/
+│   ├── AskPanel.tsx             # Slide-over query panel (Sheet)
+│   └── AskButton.tsx            # Floating trigger button
+└── hooks/
+    └── useAsk.ts                # TanStack Query hook for /api/ask
 ```
 
 ---
@@ -67,25 +82,27 @@ src/
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerRosterTools } from "./tools/roster-tools";
-import { registerPerformanceTools } from "./tools/performance-tools";
-import { registerAssignmentTools } from "./tools/assignment-tools";
-import { registerImpactTools } from "./tools/impact-tools";
-import { registerStandardsTools } from "./tools/standards-tools";
+import { registerRosterTools } from "./tools/roster-tools.js";
+import { registerPerformanceTools } from "./tools/performance-tools.js";
+import { registerAssignmentTools } from "./tools/assignment-tools.js";
+import { registerImpactTools } from "./tools/impact-tools.js";
+import { registerStandardsTools } from "./tools/standards-tools.js";
+import { registerAnalyticsTools } from "./tools/analytics-tools.js";
 
 const server = new McpServer({
   name: "teacher-dashboard",
   version: "1.0.0",
 });
 
-// Register all tool groups
+// Register all 6 tool groups (17 tools total)
 registerRosterTools(server);
 registerPerformanceTools(server);
 registerAssignmentTools(server);
 registerImpactTools(server);
 registerStandardsTools(server);
+registerAnalyticsTools(server);
 
-// Start the server with stdio transport
+// Start server with stdio transport
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -100,6 +117,17 @@ main().catch(console.error);
 ## 4. Tool Definitions
 
 Each tool maps to one or more existing query functions. Tools accept simple parameters and return formatted text responses suitable for an AI to relay to the teacher.
+
+**6 tool groups, 17 tools total:**
+
+| Group | File | Tools |
+|-------|------|-------|
+| Roster | `roster-tools.ts` | `list_rosters`, `list_students`, `get_student_detail` |
+| Performance | `performance-tools.ts` | `get_performance_distribution`, `get_rc_breakdown`, `get_performance_levels`, `list_test_groups`, `list_tests` |
+| Assignment | `assignment-tools.ts` | `list_assignments`, `get_student_assignments`, `create_assignment`, `delete_assignment` |
+| Impact | `impact-tools.ts` | `get_assignment_impact`, `get_all_impacts`, `get_standard_level_impact` |
+| Standards | `standards-tools.ts` | `get_standards_breakdown`, `get_students_by_standard`, `list_reporting_categories` |
+| Analytics | `analytics-tools.ts` | `query_students_natural` |
 
 ### 4a. Roster Tools (`src/mcp/tools/roster-tools.ts`)
 
@@ -222,6 +250,21 @@ Each tool maps to one or more existing query functions. Tools accept simple para
 - **Description**: List all reporting categories with their standards hierarchy (domains, sub-domains, individual standards).
 - **Parameters**: None.
 - **Calls**: `getReportingCategoriesWithStandards()`
+
+---
+
+### 4f. Analytics Tools (`src/mcp/tools/analytics-tools.ts`)
+
+#### `query_students_natural`
+- **Description**: Run common analytical queries about student performance. A higher-level tool that runs pre-built analytical queries teachers commonly ask, avoiding the need to chain multiple tool calls.
+- **Parameters**:
+  - `query` (enum, required) — One of: `worst_despite_completing`, `biggest_score_drops`, `biggest_score_gains`, `level_changes`, `unassigned_struggling`, `assignment_completion_rates`.
+  - `rosterId` (number, required)
+  - `testId1` (number, required) — First/primary test ID.
+  - `testId2` (number, optional) — Second test ID (required for comparison queries like drops/gains/level_changes).
+  - `limit` (number, optional, default 10) — Max results.
+- **Calls**: Raw SQL via `sqlite` for complex cross-table joins.
+- **Returns**: Formatted text with student names, scores, deltas, and contextual labels.
 
 ---
 
@@ -460,7 +503,7 @@ LIMIT ?
 
 ## 11. Testing Checklist
 
-After implementation, verify each tool works by running the server and testing with an MCP client:
+### MCP Server (via MCP client)
 
 - [ ] `list_rosters` returns all rosters
 - [ ] `list_students` with level filter returns only matching students
@@ -478,12 +521,85 @@ After implementation, verify each tool works by running the server and testing w
 - [ ] `create_assignment` successfully creates an assignment
 - [ ] `delete_assignment` removes an assignment cleanly
 
+### In-App Smart Query Panel
+
+- [ ] Floating sparkle button visible on all pages (bottom-right)
+- [ ] Clicking button opens slide-over panel from right
+- [ ] 9 query cards render with correct icons and colors
+- [ ] Single-test queries execute with current roster/test context
+- [ ] Two-test queries show compare-test dropdown before executing
+- [ ] Results render with formatted text (bold, bullets, numbered lists)
+- [ ] Chat history accumulates multiple queries in a session
+- [ ] "Clear" button resets message history
+- [ ] Panel scrolls to latest result automatically
+- [ ] `POST /api/ask` returns correct results for all 10 query types
+
 ---
 
-## 12. What NOT to Do
+## 12. In-App Smart Query Panel
+
+In addition to the MCP server (for AI assistants), the dashboard includes a **Smart Query Panel** — a slide-over UI that lets teachers run predefined analytical queries directly in the browser without an LLM.
+
+### Design Decision: No LLM, Predefined Query Cards
+
+Instead of a free-text chatbot requiring an LLM, the panel offers **9 clickable query cards** that map to server-side query handlers. This keeps the POC simple, fast, and dependency-free.
+
+### Components
+
+#### `/api/ask` Route (`src/app/api/ask/route.ts`)
+
+POST endpoint that accepts a query type + context parameters and returns a formatted text answer.
+
+**Supported query types (10 total):**
+
+| Query Type | Description | Needs 2nd Test |
+|---|---|---|
+| `worst_despite_completing` | Students who completed assignments but still score lowest | No |
+| `biggest_score_drops` | Students whose scores decreased between two tests | Yes |
+| `biggest_score_gains` | Students whose scores increased the most | Yes |
+| `level_changes` | Students who changed performance levels | Yes |
+| `unassigned_struggling` | Low-performing (L1–2) students with no assignments | No |
+| `assignment_completion_rates` | Completion rates ranked by least complete | No |
+| `performance_distribution` | Count/percentage at each performance level | No |
+| `weakest_standards` | Standards with highest % below proficiency | No |
+| `best_assignment_impact` | Assignments ranked by DiD impact | No |
+| `students_by_standard` | Students sorted by score on a specific standard | No |
+
+The route reuses the same raw SQL queries from the MCP analytics tools plus existing `lib/queries.ts` and `lib/impact.ts` functions.
+
+#### `AskPanel` (`src/components/AskPanel.tsx`)
+
+- **Sheet** (shadcn/ui) slide-over from the right side.
+- **9 query cards** with icons, color-coded by category (red for risks, green for gains, etc.).
+- **Chat-style message history** — each query shows the question label and formatted response.
+- **Compare-test selector** — for queries needing two tests (drops, gains, level changes), a dropdown appears to pick the second test.
+- **Markdown-lite renderer** — renders bold text, bullet points, numbered lists, and horizontal rules from the API response.
+- Auto-scrolls to the latest result.
+
+#### `AskButton` (`src/components/AskButton.tsx`)
+
+- **Floating action button** — fixed bottom-right corner, blue circle with sparkle icon.
+- Toggles the `AskPanel` sheet open/closed.
+- Rendered in `src/app/layout.tsx` (root layout) so it's available on every page.
+
+#### `useAsk` Hook (`src/hooks/useAsk.ts`)
+
+- TanStack Query `useMutation` wrapping `POST /api/ask`.
+- Maintains a `messages` array (chat history) with `{ id, role, content, timestamp }`.
+- Exposes `ask(params)`, `clearMessages()`, and `isLoading`.
+- User messages show the query card label; assistant messages show the formatted answer.
+
+### Integration
+
+Added `<AskButton />` to `src/app/layout.tsx` between `</main>` and `<Toaster />`, making it globally accessible across all dashboard pages.
+
+---
+
+## 13. What NOT to Do
 
 - Do not duplicate query logic — import from `lib/queries.ts` and `lib/impact.ts`.
 - Do not add HTTP endpoints for MCP — use stdio transport.
 - Do not embed the MCP server inside the Next.js process — it runs separately.
 - Do not add authentication to the MCP server — this is a local-only POC.
 - Do not return raw JSON — format responses as human-readable text.
+- Do not add an LLM dependency for the in-app query panel — it uses predefined query types.
