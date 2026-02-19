@@ -94,7 +94,7 @@ function LevelCard({
         <span className="text-xs font-medium text-muted-foreground">
           Level {level.level}
         </span>
-        <span className="text-sm font-semibold leading-tight">{level.name}</span>
+        <span className="text-sm font-semibold leading-tight min-h-[2.5rem]">{level.name}</span>
         <div className="mt-2 flex items-baseline gap-1">
           <span className="text-2xl font-bold" style={{ color: level.color }}>
             {level.count}
