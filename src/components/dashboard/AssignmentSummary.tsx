@@ -174,6 +174,7 @@ export function AssignmentSummary() {
         assignment={viewStudents}
         open={!!viewStudents}
         onOpenChange={(open) => !open && setViewStudents(null)}
+        rosterId={filterByRoster ? selectedRosterId : null}
       />
 
       {/* Delete confirmation dialog */}

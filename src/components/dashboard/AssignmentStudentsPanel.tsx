@@ -23,15 +23,18 @@ interface AssignmentStudentsPanelProps {
   assignment: AssignmentListItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  rosterId?: number | null;
 }
 
 export function AssignmentStudentsPanel({
   assignment,
   open,
   onOpenChange,
+  rosterId,
 }: AssignmentStudentsPanelProps) {
   const { data: students, isLoading } = useAssignmentStudents(
-    open && assignment ? assignment.id : null
+    open && assignment ? assignment.id : null,
+    rosterId
   );
 
   return (
@@ -40,7 +43,7 @@ export function AssignmentStudentsPanel({
         <SheetHeader>
           <SheetTitle>{assignment?.name ?? "Assignment"}</SheetTitle>
           <SheetDescription>
-            {assignment?.totalStudents} student{assignment?.totalStudents !== 1 ? "s" : ""} assigned
+            {students ? students.length : assignment?.totalStudents} student{(students ? students.length : assignment?.totalStudents) !== 1 ? "s" : ""}{rosterId ? " (filtered by roster)" : " assigned"}
           </SheetDescription>
         </SheetHeader>
 

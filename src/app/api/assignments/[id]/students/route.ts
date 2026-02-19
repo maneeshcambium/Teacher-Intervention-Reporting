@@ -11,7 +11,9 @@ export async function GET(
     if (isNaN(assignmentId)) {
       return NextResponse.json({ error: "Invalid assignment ID" }, { status: 400 });
     }
-    const students = getAssignmentStudents(assignmentId);
+    const rosterParam = _request.nextUrl.searchParams.get("rosterId");
+    const rosterId = rosterParam ? Number(rosterParam) : null;
+    const students = getAssignmentStudents(assignmentId, rosterId);
     return NextResponse.json(students);
   } catch (error) {
     console.error("Failed to fetch assignment students:", error);
