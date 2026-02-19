@@ -32,13 +32,11 @@ export default function DashboardPage() {
           <SimulateSyncButton />
         </div>
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <PerformanceOverview
-          selectedLevel={selectedLevel}
-          onLevelSelect={setSelectedLevel}
-        />
-        <RCBreakdown selectedRC={selectedRC} onRCSelect={setSelectedRC} />
-      </div>
+      <PerformanceOverview
+        selectedLevel={selectedLevel}
+        onLevelSelect={setSelectedLevel}
+      />
+      <RCBreakdown selectedRC={selectedRC} onRCSelect={setSelectedRC} />
       <StudentTable
         selectedLevel={selectedLevel}
         selectedRC={selectedRC}
