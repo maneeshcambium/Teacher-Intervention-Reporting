@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+type AskMode = "canned" | "ai";
 
 type QueryType =
   | "worst_despite_completing"
@@ -15,7 +17,8 @@ type QueryType =
   | "best_assignment_impact"
   | "students_by_standard";
 
-interface AskParams {
+interface CannedAskParams {
+  mode?: "canned";
   query: QueryType;
   rosterId: number;
   testId: number;
@@ -23,6 +26,19 @@ interface AskParams {
   standardId?: number;
   limit?: number;
 }
+
+interface AiAskParams {
+  mode: "ai";
+  message: string;
+  rosterId: number;
+  testId: number;
+  testId2?: number;
+  rosterName?: string;
+  testName?: string;
+  compareTestName?: string;
+}
+
+type AskParams = CannedAskParams | AiAskParams;
 
 interface ChatMessage {
   id: string;
@@ -38,14 +54,33 @@ async function postAsk(params: AskParams): Promise<string> {
     body: JSON.stringify(params),
   });
   if (!res.ok) {
-    throw new Error("Failed to run query");
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to run query");
   }
   const data = await res.json();
   return data.answer;
 }
 
+async function checkAiAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/ask");
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.aiAvailable === true;
+  } catch {
+    return false;
+  }
+}
+
 export function useAsk() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Check if AI mode is available (OpenAI key configured)
+  const { data: aiAvailable = false } = useQuery({
+    queryKey: ["ask-ai-available"],
+    queryFn: checkAiAvailable,
+    staleTime: 60_000, // recheck every minute
+  });
 
   const mutation = useMutation({
     mutationFn: postAsk,
@@ -73,9 +108,9 @@ export function useAsk() {
     },
   });
 
-  const ask = useCallback(
-    (label: string, params: AskParams) => {
-      // Add user message
+  /** Send a canned query (pre-defined query card) */
+  const askCanned = useCallback(
+    (label: string, params: CannedAskParams) => {
       setMessages((prev) => [
         ...prev,
         {
@@ -90,16 +125,35 @@ export function useAsk() {
     [mutation]
   );
 
+  /** Send a free-text AI query via LLM + MCP */
+  const askAi = useCallback(
+    (message: string, context: Omit<AiAskParams, "mode" | "message">) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: message,
+          timestamp: new Date(),
+        },
+      ]);
+      mutation.mutate({ mode: "ai", message, ...context });
+    },
+    [mutation]
+  );
+
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
 
   return {
     messages,
-    ask,
+    askCanned,
+    askAi,
     clearMessages,
     isLoading: mutation.isPending,
+    aiAvailable,
   };
 }
 
-export type { QueryType, AskParams, ChatMessage };
+export type { AskMode, QueryType, CannedAskParams, AiAskParams, AskParams, ChatMessage };

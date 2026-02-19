@@ -18,8 +18,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useAppContext } from "@/hooks/useAppContext";
-import { useAsk, type QueryType } from "@/hooks/useAsk";
+import { useAsk, type AskMode, type QueryType } from "@/hooks/useAsk";
 import {
   MessageSquare,
   TrendingDown,
@@ -33,6 +35,9 @@ import {
   Loader2,
   Trash2,
   Sparkles,
+  Send,
+  Bot,
+  Zap,
 } from "lucide-react";
 
 // ─── Query card definitions ────────────────────────────────────────────────
@@ -191,6 +196,17 @@ function renderMarkdownLite(text: string) {
   });
 }
 
+// ─── Suggested questions for AI mode ───────────────────────────────────────
+
+const SUGGESTED_QUESTIONS = [
+  "Who's struggling the most without any help?",
+  "Which students dropped the most between tests?",
+  "What assignment had the biggest impact?",
+  "Show me the weakest standards",
+  "How is my class distributed across performance levels?",
+  "Which students completed all assignments but still score low?",
+];
+
 // ─── Component ─────────────────────────────────────────────────────────────
 
 interface AskPanelProps {
@@ -199,10 +215,13 @@ interface AskPanelProps {
 }
 
 export function AskPanel({ open, onOpenChange }: AskPanelProps) {
-  const { selectedRosterId, selectedTestId, tests } = useAppContext();
-  const { messages, ask, clearMessages, isLoading } = useAsk();
+  const { selectedRosterId, selectedTestId, tests, rosters } = useAppContext();
+  const { messages, askCanned, askAi, clearMessages, isLoading, aiAvailable } = useAsk();
   const [compareTestId, setCompareTestId] = useState<number | null>(null);
+  const [mode, setMode] = useState<AskMode>("canned");
+  const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -212,13 +231,19 @@ export function AskPanel({ open, onOpenChange }: AskPanelProps) {
   // Pre-select second test if there are multiple
   useEffect(() => {
     if (tests.length >= 2 && !compareTestId) {
-      // Pick the second test (or last if more)
       const other = tests.find((t) => t.id !== selectedTestId);
       if (other) setCompareTestId(other.id);
     }
   }, [tests, selectedTestId, compareTestId]);
 
-  const handleQuery = (card: QueryCard) => {
+  // Focus input when switching to AI mode
+  useEffect(() => {
+    if (mode === "ai" && open) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [mode, open]);
+
+  const handleCannedQuery = (card: QueryCard) => {
     if (!selectedRosterId || !selectedTestId) return;
 
     const params = {
@@ -228,7 +253,41 @@ export function AskPanel({ open, onOpenChange }: AskPanelProps) {
       ...(card.needsTestId2 && compareTestId ? { testId2: compareTestId } : {}),
     };
 
-    ask(card.label, params);
+    askCanned(card.label, params);
+  };
+
+  const handleAiSubmit = () => {
+    if (!inputValue.trim() || !selectedRosterId || !selectedTestId) return;
+
+    // Resolve names for context
+    const roster = rosters.find((r) => r.id === selectedRosterId);
+    const test = tests.find((t) => t.id === selectedTestId);
+    const compareTest = compareTestId
+      ? tests.find((t) => t.id === compareTestId)
+      : undefined;
+
+    askAi(inputValue.trim(), {
+      rosterId: selectedRosterId,
+      testId: selectedTestId,
+      testId2: compareTestId ?? undefined,
+      rosterName: roster?.name,
+      testName: test?.name,
+      compareTestName: compareTest?.name,
+    });
+
+    setInputValue("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleAiSubmit();
+    }
+  };
+
+  const handleSuggestionClick = (question: string) => {
+    setInputValue(question);
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const canQuery = selectedRosterId && selectedTestId;
@@ -240,18 +299,47 @@ export function AskPanel({ open, onOpenChange }: AskPanelProps) {
         className="w-full sm:max-w-lg flex flex-col p-0"
       >
         <SheetHeader className="px-4 pt-4 pb-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-blue-500" />
-            <SheetTitle>Ask About Your Class</SheetTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-blue-500" />
+              <SheetTitle>Ask About Your Class</SheetTitle>
+            </div>
           </div>
           <SheetDescription>
-            Run quick queries about student performance, assignments, and impact.
+            {mode === "canned"
+              ? "Run quick queries about student performance, assignments, and impact."
+              : "Ask any question about your students using AI."}
           </SheetDescription>
+
+          {/* Mode toggle */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2">
+              <Zap className={`h-3.5 w-3.5 ${mode === "canned" ? "text-amber-500" : "text-muted-foreground/40"}`} />
+              <Label htmlFor="ask-mode" className="text-xs text-muted-foreground cursor-pointer">
+                Quick
+              </Label>
+              <Switch
+                id="ask-mode"
+                checked={mode === "ai"}
+                onCheckedChange={(checked) => setMode(checked ? "ai" : "canned")}
+                disabled={!aiAvailable}
+              />
+              <Label htmlFor="ask-mode" className="text-xs text-muted-foreground cursor-pointer">
+                AI
+              </Label>
+              <Bot className={`h-3.5 w-3.5 ${mode === "ai" ? "text-blue-500" : "text-muted-foreground/40"}`} />
+            </div>
+            {!aiAvailable && (
+              <span className="text-[10px] text-muted-foreground/60 italic">
+                Set OPENAI_API_KEY to enable AI
+              </span>
+            )}
+          </div>
         </SheetHeader>
 
         <Separator />
 
-        {/* Compare test selector for two-test queries */}
+        {/* Compare test selector */}
         {tests.length >= 2 && (
           <div className="px-4 py-2 bg-slate-50 border-b">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -287,7 +375,9 @@ export function AskPanel({ open, onOpenChange }: AskPanelProps) {
               <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-30" />
               <p className="text-sm font-medium">No queries yet</p>
               <p className="text-xs mt-1">
-                Click a query below to get started
+                {mode === "canned"
+                  ? "Click a query below to get started"
+                  : "Type a question or click a suggestion below"}
               </p>
             </div>
           )}
@@ -314,7 +404,7 @@ export function AskPanel({ open, onOpenChange }: AskPanelProps) {
           {isLoading && (
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Analyzing...
+              {mode === "ai" ? "Thinking..." : "Analyzing..."}
             </div>
           )}
 
@@ -323,57 +413,118 @@ export function AskPanel({ open, onOpenChange }: AskPanelProps) {
 
         <Separator />
 
-        {/* Query buttons */}
-        <div className="px-4 py-3 bg-white border-t space-y-2 max-h-[45%] overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Quick Queries
-            </p>
-            {messages.length > 0 && (
+        {/* ── Bottom section: mode-dependent ─────────────────────────────── */}
+        {mode === "canned" ? (
+          /* Canned query cards */
+          <div className="px-4 py-3 bg-white border-t space-y-2 max-h-[45%] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Quick Queries
+              </p>
+              {messages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearMessages}
+                  className="h-6 text-xs text-muted-foreground"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              {QUERY_CARDS.map((card) => {
+                const disabled = !canQuery || isLoading || (card.needsTestId2 && !compareTestId);
+                return (
+                  <button
+                    key={card.id}
+                    onClick={() => handleCannedQuery(card)}
+                    disabled={disabled}
+                    className={`flex items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${card.color}`}
+                  >
+                    <span className="mt-0.5 shrink-0">{card.icon}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium leading-tight">
+                        {card.label}
+                      </p>
+                      <p className="text-[10px] leading-tight opacity-70 mt-0.5 line-clamp-2">
+                        {card.description}
+                      </p>
+                    </div>
+                    {card.needsTestId2 && (
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-[9px] px-1 py-0 h-4 mt-0.5"
+                      >
+                        2 tests
+                      </Badge>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* AI mode: text input + suggestions */
+          <div className="px-4 py-3 bg-white border-t space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Ask Anything
+              </p>
+              {messages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearMessages}
+                  className="h-6 text-xs text-muted-foreground"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {/* Text input */}
+            <div className="flex gap-2">
+              <textarea
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a question about your class..."
+                disabled={!canQuery || isLoading}
+                rows={2}
+                className="flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
               <Button
-                variant="ghost"
+                onClick={handleAiSubmit}
+                disabled={!canQuery || isLoading || !inputValue.trim()}
                 size="sm"
-                onClick={clearMessages}
-                className="h-6 text-xs text-muted-foreground"
+                className="h-auto px-3"
               >
-                <Trash2 className="h-3 w-3 mr-1" />
-                Clear
+                <Send className="h-4 w-4" />
               </Button>
+            </div>
+
+            {/* Suggested questions */}
+            {messages.length === 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {SUGGESTED_QUESTIONS.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => handleSuggestionClick(q)}
+                    disabled={!canQuery || isLoading}
+                    className="text-[11px] px-2 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
-
-          <div className="grid grid-cols-2 gap-1.5">
-            {QUERY_CARDS.map((card) => {
-              const disabled = !canQuery || isLoading || (card.needsTestId2 && !compareTestId);
-              return (
-                <button
-                  key={card.id}
-                  onClick={() => handleQuery(card)}
-                  disabled={disabled}
-                  className={`flex items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${card.color}`}
-                >
-                  <span className="mt-0.5 shrink-0">{card.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium leading-tight">
-                      {card.label}
-                    </p>
-                    <p className="text-[10px] leading-tight opacity-70 mt-0.5 line-clamp-2">
-                      {card.description}
-                    </p>
-                  </div>
-                  {card.needsTestId2 && (
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 text-[9px] px-1 py-0 h-4 mt-0.5"
-                    >
-                      2 tests
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        )}
       </SheetContent>
     </Sheet>
   );

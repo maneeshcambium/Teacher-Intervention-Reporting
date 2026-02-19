@@ -11,6 +11,7 @@ import {
   calculateAllImpacts,
   calculateAssignmentImpact,
 } from "@/lib/impact";
+import { askWithMcpTools, isLlmConfigured } from "@/lib/llm";
 
 // ─── Query type definitions ────────────────────────────────────────────────
 
@@ -26,7 +27,8 @@ type QueryType =
   | "best_assignment_impact"
   | "students_by_standard";
 
-interface AskRequest {
+interface CannedAskRequest {
+  mode?: "canned";
   query: QueryType;
   rosterId: number;
   testId: number;
@@ -35,6 +37,19 @@ interface AskRequest {
   limit?: number;
 }
 
+interface AiAskRequest {
+  mode: "ai";
+  message: string;
+  rosterId: number;
+  testId: number;
+  testId2?: number;
+  rosterName?: string;
+  testName?: string;
+  compareTestName?: string;
+}
+
+type AskRequest = CannedAskRequest | AiAskRequest;
+
 const LEVEL_NAMES: Record<number, string> = {
   1: "Beginning",
   2: "Approaching",
@@ -42,12 +57,50 @@ const LEVEL_NAMES: Record<number, string> = {
   4: "Advanced",
 };
 
+// ─── GET handler (check AI availability) ───────────────────────────────────
+
+export async function GET() {
+  return NextResponse.json({ aiAvailable: isLlmConfigured() });
+}
+
 // ─── POST handler ──────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as AskRequest;
-    const { query, rosterId, testId, testId2, standardId, limit = 10 } = body;
+
+    // ── AI mode (LLM + MCP) ────────────────────────────────────────────
+    if (body.mode === "ai") {
+      const { message, rosterId, testId, testId2, rosterName, testName, compareTestName } = body;
+
+      if (!message || !rosterId || !testId) {
+        return NextResponse.json(
+          { error: "message, rosterId, and testId are required" },
+          { status: 400 }
+        );
+      }
+
+      if (!isLlmConfigured()) {
+        return NextResponse.json(
+          { error: "AI mode is not available — OPENAI_API_KEY is not configured in .env.local" },
+          { status: 503 }
+        );
+      }
+
+      const answer = await askWithMcpTools(message, {
+        rosterId,
+        testId,
+        testId2,
+        rosterName,
+        testName,
+        compareTestName,
+      });
+
+      return NextResponse.json({ answer });
+    }
+
+    // ── Canned mode (original pre-canned queries) ──────────────────────
+    const { query, rosterId, testId, testId2, standardId, limit = 10 } = body as CannedAskRequest;
 
     if (!query || !rosterId || !testId) {
       return NextResponse.json(
@@ -392,6 +445,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ answer });
   } catch (error) {
     console.error("Ask API error:", error);
+
+    // Surface OpenAI-specific errors with helpful messages
+    if (error instanceof Error) {
+      const msg = error.message ?? "";
+
+      if (msg.includes("insufficient_quota") || msg.includes("429")) {
+        return NextResponse.json(
+          { error: "OpenAI API quota exceeded. Please check your billing at platform.openai.com." },
+          { status: 429 }
+        );
+      }
+
+      if (msg.includes("401") || msg.includes("Incorrect API key")) {
+        return NextResponse.json(
+          { error: "Invalid OpenAI API key. Please check OPENAI_API_KEY in .env.local." },
+          { status: 401 }
+        );
+      }
+
+      if (msg.includes("model_not_found") || msg.includes("does not exist")) {
+        return NextResponse.json(
+          { error: `Model not found. Check OPENAI_MODEL in .env.local (current: ${process.env.OPENAI_MODEL ?? "gpt-4o-mini"}).` },
+          { status: 400 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
