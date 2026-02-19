@@ -161,6 +161,13 @@ export interface StudentPoint {
   post: number;
 }
 
+export interface StandardDiDSummary {
+  code: string;
+  treatedDelta: number;
+  controlDelta: number;
+  didImpact: number;
+}
+
 export interface ImpactResult {
   assignmentId: number;
   assignmentName: string;
@@ -191,6 +198,9 @@ export interface ImpactResult {
   // Statistical significance
   pValue: number | null;
   isSignificant: boolean;
+
+  // Per-standard DiD breakdown (inline in summary cards)
+  standardImpacts?: StandardDiDSummary[];
 
   // Raw data for scatter plot (only in single-assignment detail)
   treatedPoints?: StudentPoint[];

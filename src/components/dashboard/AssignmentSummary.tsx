@@ -51,15 +51,22 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 export function AssignmentSummary() {
-  const { selectedTestGroupId, selectedRosterId, rosters } = useAppContext();
+  const { selectedTestGroupId, selectedRosterId, selectedTestId, rosters, tests } = useAppContext();
   const [filterByRoster, setFilterByRoster] = useState(false);
+  const [filterByTest, setFilterByTest] = useState(false);
   const effectiveRosterId = filterByRoster ? selectedRosterId : null;
-  const { data: assignments, isLoading } = useAssignments(selectedTestGroupId, effectiveRosterId);
+  const { data: allAssignments, isLoading } = useAssignments(selectedTestGroupId, effectiveRosterId);
   const deleteMutation = useDeleteAssignment();
   const [deleteTarget, setDeleteTarget] = useState<AssignmentListItem | null>(null);
   const [viewStudents, setViewStudents] = useState<AssignmentListItem | null>(null);
 
   const selectedRosterName = rosters.find((r) => r.id === selectedRosterId)?.name ?? "Selected Roster";
+  const selectedTestName = tests.find((t) => t.id === selectedTestId)?.name ?? "Selected Test";
+
+  // Client-side filter: only show assignments created after the selected test
+  const assignments = filterByTest && selectedTestId
+    ? allAssignments?.filter((a) => a.createdAfterTestId === selectedTestId)
+    : allAssignments;
 
   const handleDelete = () => {
     if (!deleteTarget) return;
@@ -89,16 +96,33 @@ export function AssignmentSummary() {
                   {selectedRosterName}
                 </Badge>
               )}
+              {filterByTest && (
+                <Badge variant="outline" className="text-xs">
+                  {selectedTestName}
+                </Badge>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="roster-filter" className="text-sm text-muted-foreground cursor-pointer">
-                Filter by roster
-              </Label>
-              <Switch
-                id="roster-filter"
-                checked={filterByRoster}
-                onCheckedChange={setFilterByRoster}
-              />
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="test-filter" className="text-sm text-muted-foreground cursor-pointer">
+                  Filter by test
+                </Label>
+                <Switch
+                  id="test-filter"
+                  checked={filterByTest}
+                  onCheckedChange={setFilterByTest}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="roster-filter" className="text-sm text-muted-foreground cursor-pointer">
+                  Filter by roster
+                </Label>
+                <Switch
+                  id="roster-filter"
+                  checked={filterByRoster}
+                  onCheckedChange={setFilterByRoster}
+                />
+              </div>
             </div>
           </div>
         </CardHeader>

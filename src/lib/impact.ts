@@ -1,6 +1,6 @@
 import { sqlite } from "./db";
 import { tTestTwoSample } from "simple-statistics";
-import type { ImpactResult, StudentPoint, StandardDiDResult, StandardImpactResult } from "@/types";
+import type { ImpactResult, StudentPoint, StandardDiDResult, StandardImpactResult, StandardDiDSummary } from "@/types";
 
 interface AssignmentMeta {
   id: number;
@@ -254,6 +254,58 @@ export function calculateAssignmentImpact(
     }
   }
 
+  // 9. Compute per-standard DiD for inline card display
+  const standardImpacts: StandardDiDSummary[] = standardRows.map((std) => {
+    const sid = String(std.standardId);
+
+    // Treated gains for this standard
+    const treatedStdPreVals: number[] = [];
+    const treatedStdPostVals: number[] = [];
+    for (const studentId of treatedStudentIds) {
+      const preJson = treatedPreScores.get(studentId);
+      const postJson = treatedPostScores.get(studentId);
+      if (!preJson || !postJson) continue;
+      const preParsed = JSON.parse(preJson) as Record<string, number>;
+      const postParsed = JSON.parse(postJson) as Record<string, number>;
+      const preVal = preParsed[sid];
+      const postVal = postParsed[sid];
+      if (preVal != null && postVal != null) {
+        treatedStdPreVals.push(preVal);
+        treatedStdPostVals.push(postVal);
+      }
+    }
+
+    // Control gains for this standard
+    const controlStdPreVals: number[] = [];
+    const controlStdPostVals: number[] = [];
+    for (const studentId of controlStudentIds) {
+      const preJson = controlPreScores.get(studentId);
+      const postJson = controlPostScores.get(studentId);
+      if (!preJson || !postJson) continue;
+      const preParsed = JSON.parse(preJson) as Record<string, number>;
+      const postParsed = JSON.parse(postJson) as Record<string, number>;
+      const preVal = preParsed[sid];
+      const postVal = postParsed[sid];
+      if (preVal != null && postVal != null) {
+        controlStdPreVals.push(preVal);
+        controlStdPostVals.push(postVal);
+      }
+    }
+
+    const tDelta = mean(treatedStdPostVals) - mean(treatedStdPreVals);
+    const cDelta = mean(controlStdPostVals) - mean(controlStdPreVals);
+
+    return {
+      code: std.code,
+      treatedDelta: Math.round(tDelta),
+      controlDelta: Math.round(cDelta),
+      didImpact: Math.round(tDelta - cDelta),
+    };
+  });
+
+  // Sort by didImpact descending
+  standardImpacts.sort((a, b) => b.didImpact - a.didImpact);
+
   const result: ImpactResult = {
     assignmentId: assignment.id,
     assignmentName: assignment.name,
@@ -274,6 +326,7 @@ export function calculateAssignmentImpact(
     didImpactPercent,
     pValue: pValue != null ? Math.round(pValue * 1000) / 1000 : null,
     isSignificant,
+    standardImpacts,
   };
 
   if (includePoints) {

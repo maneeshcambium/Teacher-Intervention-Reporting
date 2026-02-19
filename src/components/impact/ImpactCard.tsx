@@ -136,19 +136,45 @@ function ImpactCard({
           )}
         </div>
 
-        {/* Standard chips */}
-        <div className="flex flex-wrap gap-1">
-          {impact.standards.slice(0, 4).map((std) => (
-            <Badge key={std} variant="outline" className="text-xs">
-              {std}
-            </Badge>
-          ))}
-          {impact.standards.length > 4 && (
-            <Badge variant="outline" className="text-xs">
-              +{impact.standards.length - 4}
-            </Badge>
-          )}
-        </div>
+        {/* Per-standard DiD mini-table */}
+        {impact.standardImpacts && impact.standardImpacts.length > 0 ? (
+          <div className="rounded border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left px-2 py-1 font-medium">Standard</th>
+                  <th className="text-right px-2 py-1 font-medium">Treated Δ</th>
+                  <th className="text-right px-2 py-1 font-medium">Ctrl Δ</th>
+                  <th className="text-right px-2 py-1 font-medium">DiD</th>
+                </tr>
+              </thead>
+              <tbody>
+                {impact.standardImpacts.map((si) => (
+                  <tr key={si.code} className="border-b last:border-0">
+                    <td className="px-2 py-1 font-mono">{si.code}</td>
+                    <td className={`px-2 py-1 text-right ${si.treatedDelta >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {si.treatedDelta >= 0 ? "+" : ""}{si.treatedDelta}
+                    </td>
+                    <td className={`px-2 py-1 text-right ${si.controlDelta >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {si.controlDelta >= 0 ? "+" : ""}{si.controlDelta}
+                    </td>
+                    <td className={`px-2 py-1 text-right font-bold ${si.didImpact >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {si.didImpact >= 0 ? "+" : ""}{si.didImpact}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {impact.standards.map((std) => (
+              <Badge key={std} variant="outline" className="text-xs">
+                {std}
+              </Badge>
+            ))}
+          </div>
+        )}
 
         {/* Mini comparison */}
         <div className="text-xs text-muted-foreground space-y-0.5">
