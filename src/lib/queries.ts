@@ -25,6 +25,8 @@ import type {
   StudentTestScore,
   StudentAssignmentDetail,
   StudentAssignmentsResponse,
+  StandardsBreakdownResponse,
+  StandardStudentsResponse,
 } from "@/types";
 
 // ─── Performance Level Distribution ────────────────────────────────────────
@@ -526,4 +528,156 @@ export function getStudentAssignments(studentId: number): StudentAssignmentsResp
   });
 
   return { assignments: assignmentList };
+}
+
+// ─── Standards Breakdown ───────────────────────────────────────────────────
+
+export function getStandardsBreakdown(
+  rosterId: number,
+  testId: number
+): StandardsBreakdownResponse {
+  const rcs = db.select().from(reportingCategories).orderBy(asc(reportingCategories.id)).all();
+  const allStandards = db.select().from(standards).orderBy(asc(standards.id)).all();
+
+  const scoreRows = db
+    .select({
+      level: scores.level,
+      stdScores: scores.stdScores,
+    })
+    .from(scores)
+    .innerJoin(students, eq(students.id, scores.studentId))
+    .where(and(eq(students.rosterId, rosterId), eq(scores.testId, testId)))
+    .all();
+
+  const PROFICIENCY_THRESHOLD = 5470;
+
+  return {
+    categories: rcs.map((rc) => {
+      const rcStandards = allStandards.filter((s) => s.rcId === rc.id);
+
+      return {
+        rcId: rc.id,
+        rcName: rc.name,
+        standards: rcStandards.map((std) => {
+          const levelMap: Record<number, { sum: number; count: number }> = {};
+          let belowCount = 0;
+          let totalWithScore = 0;
+          let totalSum = 0;
+
+          for (const row of scoreRows) {
+            const parsed = JSON.parse(row.stdScores) as Record<string, number>;
+            const stdScore = parsed[String(std.id)];
+            if (stdScore == null) continue;
+
+            totalWithScore++;
+            totalSum += stdScore;
+            if (stdScore < PROFICIENCY_THRESHOLD) belowCount++;
+
+            if (!levelMap[row.level]) levelMap[row.level] = { sum: 0, count: 0 };
+            levelMap[row.level].sum += stdScore;
+            levelMap[row.level].count += 1;
+          }
+
+          return {
+            standardId: std.id,
+            code: std.code,
+            description: std.description,
+            domain: std.domain,
+            overallAvg: totalWithScore > 0 ? Math.round(totalSum / totalWithScore) : 0,
+            belowProficiencyCount: belowCount,
+            totalCount: totalWithScore,
+            belowProficiencyPct:
+              totalWithScore > 0
+                ? Math.round((belowCount / totalWithScore) * 1000) / 10
+                : 0,
+            byLevel: [1, 2, 3, 4]
+              .filter((l) => levelMap[l])
+              .map((l) => ({
+                level: l,
+                avgScore: Math.round(levelMap[l].sum / levelMap[l].count),
+                count: levelMap[l].count,
+              })),
+          };
+        }),
+      };
+    }),
+  };
+}
+
+// ─── Students by Standard ──────────────────────────────────────────────────
+
+export function getStudentsByStandard(
+  rosterId: number,
+  testId: number,
+  standardId: number
+): StandardStudentsResponse {
+  const PROFICIENCY_THRESHOLD = 5470;
+
+  const std = db
+    .select()
+    .from(standards)
+    .where(eq(standards.id, standardId))
+    .get();
+
+  if (!std) throw new Error("Standard not found");
+
+  const rc = db
+    .select()
+    .from(reportingCategories)
+    .where(eq(reportingCategories.id, std.rcId))
+    .get();
+
+  const rows = sqlite
+    .prepare(
+      `
+      SELECT
+        s.id,
+        s.name,
+        sc.overall_score as overallScore,
+        sc.level as overallLevel,
+        sc.std_scores as stdScores,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM assignment_students asn
+          JOIN assignment_standards ast ON ast.assignment_id = asn.assignment_id
+          WHERE asn.student_id = s.id AND ast.standard_id = ?
+        ) THEN 1 ELSE 0 END as hasAssignment
+      FROM students s
+      JOIN scores sc ON sc.student_id = s.id AND sc.test_id = ?
+      WHERE s.roster_id = ?
+      ORDER BY CAST(JSON_EXTRACT(sc.std_scores, '$.' || ?) AS INTEGER) ASC
+    `
+    )
+    .all(standardId, testId, rosterId, String(standardId)) as Array<{
+    id: number;
+    name: string;
+    overallScore: number;
+    overallLevel: number;
+    stdScores: string;
+    hasAssignment: number;
+  }>;
+
+  const studentRows = rows.map((r) => {
+    const parsed = JSON.parse(r.stdScores) as Record<string, number>;
+    const stdScore = parsed[String(standardId)] ?? 0;
+    return {
+      id: r.id,
+      name: r.name,
+      overallScore: r.overallScore,
+      overallLevel: r.overallLevel,
+      standardScore: stdScore,
+      isProficient: stdScore >= PROFICIENCY_THRESHOLD,
+      hasAssignment: r.hasAssignment === 1,
+    };
+  });
+
+  return {
+    standard: {
+      id: std.id,
+      code: std.code,
+      description: std.description,
+      rcId: std.rcId,
+      rcName: rc?.name ?? "Unknown",
+    },
+    students: studentRows,
+  };
 }

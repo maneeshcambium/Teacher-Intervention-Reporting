@@ -242,3 +242,54 @@ export interface StudentAssignmentDetail {
 export interface StudentAssignmentsResponse {
   assignments: StudentAssignmentDetail[];
 }
+
+// ─── Standards Analysis Types ───────────────────────────────────────────────
+
+export interface StandardLevelBreakdown {
+  level: number;
+  avgScore: number;
+  count: number;
+}
+
+export interface StandardBreakdownItem {
+  standardId: number;
+  code: string;
+  description: string;
+  domain: string;
+  overallAvg: number;
+  belowProficiencyCount: number;
+  totalCount: number;
+  belowProficiencyPct: number;
+  byLevel: StandardLevelBreakdown[];
+}
+
+export interface StandardsBreakdownCategory {
+  rcId: number;
+  rcName: string;
+  standards: StandardBreakdownItem[];
+}
+
+export interface StandardsBreakdownResponse {
+  categories: StandardsBreakdownCategory[];
+}
+
+export interface StandardStudentRow {
+  id: number;
+  name: string;
+  overallScore: number;
+  overallLevel: number;
+  standardScore: number;
+  isProficient: boolean;
+  hasAssignment: boolean;
+}
+
+export interface StandardStudentsResponse {
+  standard: {
+    id: number;
+    code: string;
+    description: string;
+    rcId: number;
+    rcName: string;
+  };
+  students: StandardStudentRow[];
+}
