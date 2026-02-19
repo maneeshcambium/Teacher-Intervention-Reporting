@@ -11,7 +11,7 @@ export function registerAssignmentTools(server: McpServer) {
   // ── list_assignments ─────────────────────────────────────────────────────
   server.tool(
     "list_assignments",
-    "List all intervention assignments in a test group with platform, targeted standards, and student completion status breakdown (not_started / started / completed).",
+    "List all assignments in a test group with platform, targeted standards, and student completion status breakdown (not_started / started / completed).",
     {
       groupId: z.number().describe("The test group ID"),
     },
@@ -57,7 +57,7 @@ export function registerAssignmentTools(server: McpServer) {
   // ── get_student_assignments ──────────────────────────────────────────────
   server.tool(
     "get_student_assignments",
-    "Get all intervention assignments for a specific student, including status (not_started/started/completed), targeted standards, and pre/post test info.",
+    "Get all assignments for a specific student, including status (not_started/started/completed), targeted standards, and pre/post test info.",
     {
       studentId: z.number().describe("The student ID"),
     },
@@ -109,7 +109,7 @@ export function registerAssignmentTools(server: McpServer) {
   // ── create_assignment ────────────────────────────────────────────────────
   server.tool(
     "create_assignment",
-    "Create a new intervention assignment for selected students targeting specific standards on an external platform (ixl, lexiacore5, reflex, khan_academy).",
+    "Create a new assignment for selected students targeting specific standards on an external platform (ixl, lexiacore5, reflex, khan_academy).",
     {
       name: z.string().describe("Assignment name"),
       platform: z

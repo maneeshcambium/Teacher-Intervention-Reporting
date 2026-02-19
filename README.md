@@ -1,6 +1,6 @@
-# Teacher Intervention Dashboard
+# TeachImpact
 
-A data-driven dashboard that helps teachers track student performance across sequential Progress Monitoring (PM) tests, assign targeted interventions on external platforms, and measure impact using **Difference-in-Differences (DiD)** statistical analysis.
+A data-driven dashboard that helps teachers track student performance across sequential Progress Monitoring (PM) tests, assign targeted practice on external platforms, and measure impact using **Difference-in-Differences (DiD)** statistical analysis.
 
 ![Status](https://img.shields.io/badge/status-hackathon%20POC-blue) ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![SQLite](https://img.shields.io/badge/SQLite-Drizzle%20ORM-green)
 
@@ -14,7 +14,7 @@ Teachers administer periodic PM tests to students. After reviewing results, they
 
 1. **Tracks performance** across up to 6 PM windows per year with scale scores (~5100–5800) bucketed into 4 performance levels
 2. **Breaks down scores** by Reporting Category (RC) and individual standards to pinpoint skill gaps
-3. **Manages interventions** — teachers select struggling students, assign practice on external platforms, and track completion
+3. **Manages assignments** — teachers select struggling students, assign practice on external platforms, and track completion
 4. **Measures impact** using DiD analysis: `Impact = (Treated_PM2 − Treated_PM1) − (Control_PM2 − Control_PM1)`
 5. **Standards-level analysis** — heatmap view of per-standard mastery with drill-down to individual students
 
@@ -91,7 +91,7 @@ The database is auto-created on first run. Click the **"Seed Data"** button in t
 - **Score Cards** — Overall scale score and performance level across tests
 - **RC Table** — Per-category scores with trend indicators
 - **Standards Accordion** — Expandable view of individual standard mastery
-- **Task List** — Assigned interventions with status tracking
+- **Task List** — Assigned tasks with status tracking
 
 ---
 
@@ -109,7 +109,7 @@ The database is auto-created on first run. Click the **"Seed Data"** button in t
 | `reporting_categories` | RC definitions (e.g., Reading Informational Text) |
 | `standards` | Individual standards linked to RCs |
 | `scores` | Student test scores (overall + JSON RC/standard scores) |
-| `assignments` | Teacher-created interventions |
+| `assignments` | Teacher-created assignments |
 | `assignment_standards` | Standards targeted by an assignment |
 | `assignment_students` | Student assignment status tracking |
 
@@ -175,7 +175,7 @@ src/
 
 ## Impact Analysis (DiD)
 
-The dashboard uses Difference-in-Differences to measure intervention effectiveness:
+The dashboard uses Difference-in-Differences to measure assignment effectiveness:
 
 ```
 Impact = (Treated_PM2 − Treated_PM1) − (Control_PM2 − Control_PM1)

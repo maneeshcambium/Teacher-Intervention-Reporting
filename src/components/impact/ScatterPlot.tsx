@@ -106,7 +106,7 @@ export function ScatterPlot({ impact, isLoading }: ScatterPlotProps) {
               dataKey="pre"
               name="Pre Score"
               domain={[axisMin, axisMax]}
-              label={{ value: "Pre-Intervention Score", position: "bottom", offset: 5 }}
+              label={{ value: "Pre-Assignment Score", position: "bottom", offset: 5 }}
             />
             <YAxis
               type="number"
@@ -114,7 +114,7 @@ export function ScatterPlot({ impact, isLoading }: ScatterPlotProps) {
               name="Post Score"
               domain={[axisMin, axisMax]}
               label={{
-                value: "Post-Intervention Score",
+                value: "Post-Assignment Score",
                 angle: -90,
                 position: "insideLeft",
                 offset: 0,

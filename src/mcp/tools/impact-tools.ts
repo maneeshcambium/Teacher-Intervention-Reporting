@@ -104,7 +104,7 @@ export function registerImpactTools(server: McpServer) {
   // ── get_standard_level_impact ────────────────────────────────────────────
   server.tool(
     "get_standard_level_impact",
-    "Get per-standard DiD breakdown for an assignment. Shows which specific standards improved and which didn't, helping teachers identify where re-intervention is needed.",
+    "Get per-standard DiD breakdown for an assignment. Shows which specific standards improved and which didn't, helping teachers identify where re-assignment is needed.",
     {
       assignmentId: z.number().describe("The assignment ID"),
     },

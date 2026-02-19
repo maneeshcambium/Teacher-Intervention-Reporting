@@ -92,7 +92,7 @@ interface AskContext {
 function buildSystemPrompt(ctx: AskContext): string {
   let prompt = `You are a helpful teaching assistant for an elementary school teacher.
 You have access to tools that query a student performance dashboard with test scores,
-intervention assignments, and Difference-in-Differences (DiD) impact analysis.
+assignments, and Difference-in-Differences (DiD) impact analysis.
 
 CURRENT CONTEXT (auto-injected — use these values by default):
 - Roster ID: ${ctx.rosterId}${ctx.rosterName ? ` (${ctx.rosterName})` : ""}

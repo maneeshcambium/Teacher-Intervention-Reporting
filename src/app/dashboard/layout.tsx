@@ -31,13 +31,13 @@ export default function DashboardLayout({
                 href={tab.href}
                 className={`relative px-4 py-3 text-sm font-medium transition-colors ${
                   isActive
-                    ? "text-blue-600"
+                    ? "text-[#00A79D]"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab.label}
                 {isActive && (
-                  <span className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-600 rounded-t" />
+                  <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[#00A79D] rounded-t" />
                 )}
               </Link>
             );

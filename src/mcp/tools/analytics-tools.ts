@@ -87,14 +87,14 @@ export function registerAnalyticsTools(server: McpServer) {
             }
 
             let text = "## Students Who Performed Worst Despite Completing Assignments\n\n";
-            text += "These students completed intervention assignments but still have the lowest scores:\n\n";
+            text += "These students completed assignments but still have the lowest scores:\n\n";
 
             for (const r of rows) {
               text += `• **${r.name}** (ID: ${r.id}) — Score: ${r.overallScore} (${levelNames[r.level] ?? `Level ${r.level}`})\n`;
               text += `  Completed ${r.completedCount} assignment(s): ${r.completedAssignments}\n\n`;
             }
 
-            text += "Recommendation: These students may need different intervention strategies or more targeted support.";
+            text += "Recommendation: These students may need different strategies or more targeted support.";
             return { content: [{ type: "text" as const, text }] };
           }
 
@@ -307,7 +307,7 @@ export function registerAnalyticsTools(server: McpServer) {
             }
 
             let text = "## Struggling Students Without Assignments\n\n";
-            text += "These students are at Level 1 (Beginning) or Level 2 (Approaching) but have NO intervention assignments:\n\n";
+            text += "These students are at Level 1 (Beginning) or Level 2 (Approaching) but have NO assignments:\n\n";
 
             for (const r of rows) {
               text += `• **${r.name}** (ID: ${r.id}) — Score: ${r.overallScore} (${levelNames[r.level]})\n`;

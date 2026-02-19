@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Teacher Intervention Dashboard",
-  description: "Track student performance and manage interventions",
+  title: "TeachImpact — Cambium Assessment",
+  description: "Track student performance and measure assignment impact",
 };
 
 export default function RootLayout({

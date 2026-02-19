@@ -1,8 +1,8 @@
-# Copilot Instructions — Teacher Intervention Dashboard
+# Copilot Instructions — TeachImpact
 
 ## Project Overview
 
-This is a **Teacher Intervention Dashboard** — a hackathon POC that tracks student performance across sequential Progress Monitoring (PM) tests, manages teacher-assigned interventions on external platforms (IXL, Khan Academy, etc.), and measures impact using Difference-in-Differences (DiD) statistical analysis.
+This is **TeachImpact** — a hackathon POC that tracks student performance across sequential Progress Monitoring (PM) tests, manages teacher-assigned practice on external platforms (IXL, Khan Academy, etc.), and measures impact using Difference-in-Differences (DiD) statistical analysis.
 
 ## Tech Stack
 

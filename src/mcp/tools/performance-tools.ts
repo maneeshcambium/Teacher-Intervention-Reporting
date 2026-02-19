@@ -66,7 +66,7 @@ export function registerPerformanceTools(server: McpServer) {
         text += "\n";
       }
 
-      text += "Note: Proficiency threshold = 5470. Scores below this indicate students need intervention.";
+      text += "Note: Proficiency threshold = 5470. Scores below this indicate students need targeted support.";
 
       return { content: [{ type: "text" as const, text }] };
     }
