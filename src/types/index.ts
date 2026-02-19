@@ -324,3 +324,33 @@ export interface StandardImpactResult {
   overallDidImpact: number;
   standards: StandardDiDResult[];
 }
+
+// ─── Student × Standard Matrix (Heatmap) Types ─────────────────────────────
+
+export interface StudentStandardScores {
+  id: number;
+  name: string;
+  overallScore: number;
+  level: number;
+  standardScores: Record<string, number>;
+}
+
+export interface HeatmapStandard {
+  id: number;
+  code: string;
+  description: string;
+  rcId: number;
+  rcName: string;
+}
+
+export interface HeatmapSummary {
+  proficiencyThreshold: number;
+  classAvgByStandard: Record<string, number>;
+  belowProfByStandard: Record<string, number>;
+}
+
+export interface StudentStandardMatrixResponse {
+  students: StudentStandardScores[];
+  standards: HeatmapStandard[];
+  summary: HeatmapSummary;
+}

@@ -27,6 +27,9 @@ import type {
   StudentAssignmentsResponse,
   StandardsBreakdownResponse,
   StandardStudentsResponse,
+  StudentStandardMatrixResponse,
+  StudentStandardScores,
+  HeatmapStandard,
 } from "@/types";
 
 // ─── Performance Level Distribution ────────────────────────────────────────
@@ -631,6 +634,90 @@ export function getStandardsBreakdown(
         }),
       };
     }),
+  };
+}
+
+// ─── Student × Standard Matrix (Heatmap) ──────────────────────────────────
+
+export function getStudentStandardMatrix(
+  rosterId: number,
+  testId: number
+): StudentStandardMatrixResponse {
+  const PROFICIENCY_THRESHOLD = 5470;
+
+  // 1. Get all standards with their RC info
+  const allStandards = db
+    .select({
+      id: standards.id,
+      code: standards.code,
+      description: standards.description,
+      rcId: standards.rcId,
+    })
+    .from(standards)
+    .orderBy(asc(standards.rcId), asc(standards.id))
+    .all();
+
+  const rcs = db.select().from(reportingCategories).all();
+  const rcMap = Object.fromEntries(rcs.map((r) => [r.id, r.name]));
+
+  const heatmapStandards: HeatmapStandard[] = allStandards.map((s) => ({
+    ...s,
+    rcName: rcMap[s.rcId] ?? "Unknown",
+  }));
+
+  // 2. Get all student scores for this roster + test
+  const scoreRows = db
+    .select({
+      studentId: students.id,
+      studentName: students.name,
+      overallScore: scores.overallScore,
+      level: scores.level,
+      stdScores: scores.stdScores,
+    })
+    .from(scores)
+    .innerJoin(students, eq(students.id, scores.studentId))
+    .where(and(eq(students.rosterId, rosterId), eq(scores.testId, testId)))
+    .orderBy(asc(scores.overallScore))
+    .all();
+
+  // 3. Build student rows
+  const studentRows: StudentStandardScores[] = scoreRows.map((row) => ({
+    id: row.studentId,
+    name: row.studentName,
+    overallScore: row.overallScore,
+    level: row.level,
+    standardScores: JSON.parse(row.stdScores) as Record<string, number>,
+  }));
+
+  // 4. Compute summary stats per standard
+  const classAvgByStandard: Record<string, number> = {};
+  const belowProfByStandard: Record<string, number> = {};
+
+  for (const std of allStandards) {
+    let sum = 0,
+      count = 0,
+      belowCount = 0;
+    for (const student of studentRows) {
+      const score = student.standardScores[String(std.id)];
+      if (score != null) {
+        sum += score;
+        count++;
+        if (score < PROFICIENCY_THRESHOLD) belowCount++;
+      }
+    }
+    classAvgByStandard[String(std.id)] =
+      count > 0 ? Math.round(sum / count) : 0;
+    belowProfByStandard[String(std.id)] = belowCount;
+  }
+
+  return {
+    students: studentRows,
+    standards: heatmapStandards,
+    summary: {
+      proficiencyThreshold: PROFICIENCY_THRESHOLD,
+      classAvgByStandard,
+      belowProfByStandard,
+    },
   };
 }
 
