@@ -175,6 +175,10 @@ export interface ImpactResult {
   standards: string[];
   rcName: string;
 
+  // Filter metadata
+  createdAfterTestId: number;
+  rosterIds: number[];
+
   // Window info
   preTestName: string;
   postTestName: string;

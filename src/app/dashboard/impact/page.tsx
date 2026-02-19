@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useAppContext } from "@/hooks/useAppContext";
 import { useImpactSummary, useAssignmentImpact } from "@/hooks/useImpact";
 import { useStandardImpact } from "@/hooks/useStandardImpact";
@@ -13,8 +15,10 @@ import { ImpactInfoDialog } from "@/components/impact/ImpactInfoDialog";
 import { StandardImpactBreakdown } from "@/components/impact/StandardImpactBreakdown";
 
 export default function ImpactPage() {
-  const { selectedTestGroupId } = useAppContext();
+  const { selectedTestGroupId, selectedRosterId, selectedTestId, rosters, tests } = useAppContext();
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+  const [filterByTest, setFilterByTest] = useState(false);
+  const [filterByRoster, setFilterByRoster] = useState(false);
 
   const { data: summary, isLoading: summaryLoading } = useImpactSummary(
     selectedTestGroupId
@@ -28,7 +32,21 @@ export default function ImpactPage() {
     selectedAssignmentId
   );
 
-  const impacts = summary?.impacts ?? [];
+  const allImpacts = summary?.impacts ?? [];
+
+  const selectedRosterName = rosters.find((r) => r.id === selectedRosterId)?.name ?? "Selected Roster";
+  const selectedTestName = tests.find((t) => t.id === selectedTestId)?.name ?? "Selected Test";
+
+  const impacts = useMemo(() => {
+    let filtered = allImpacts;
+    if (filterByTest && selectedTestId) {
+      filtered = filtered.filter((i) => i.createdAfterTestId === selectedTestId);
+    }
+    if (filterByRoster && selectedRosterId) {
+      filtered = filtered.filter((i) => i.rosterIds?.includes(selectedRosterId));
+    }
+    return filtered;
+  }, [allImpacts, filterByTest, filterByRoster, selectedTestId, selectedRosterId]);
 
   if (summaryLoading) {
     return (
@@ -59,17 +77,49 @@ export default function ImpactPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">Impact Analysis</h1>
             <ImpactInfoDialog />
+            {filterByRoster && (
+              <Badge variant="outline" className="text-xs">
+                {selectedRosterName}
+              </Badge>
+            )}
+            {filterByTest && (
+              <Badge variant="outline" className="text-xs">
+                {selectedTestName}
+              </Badge>
+            )}
           </div>
           <p className="text-muted-foreground">
             Difference-in-Differences measurement of assignment effectiveness
           </p>
         </div>
-        {summary?.calculatedAt && (
-          <Badge variant="outline">
-            Calculated at{" "}
-            {new Date(summary.calculatedAt).toLocaleTimeString()}
-          </Badge>
-        )}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="impact-test-filter" className="text-sm text-muted-foreground cursor-pointer">
+              Filter by test
+            </Label>
+            <Switch
+              id="impact-test-filter"
+              checked={filterByTest}
+              onCheckedChange={setFilterByTest}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="impact-roster-filter" className="text-sm text-muted-foreground cursor-pointer">
+              Filter by roster
+            </Label>
+            <Switch
+              id="impact-roster-filter"
+              checked={filterByRoster}
+              onCheckedChange={setFilterByRoster}
+            />
+          </div>
+          {summary?.calculatedAt && (
+            <Badge variant="outline">
+              Calculated at{" "}
+              {new Date(summary.calculatedAt).toLocaleTimeString()}
+            </Badge>
+          )}
+        </div>
       </div>
 
       <ImpactCards
