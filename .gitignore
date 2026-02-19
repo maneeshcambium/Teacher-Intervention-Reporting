@@ -38,4 +38,9 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# database
+/data/*.db
+/data/*.db-wal
+/data/*.db-shm
 next-env.d.ts
