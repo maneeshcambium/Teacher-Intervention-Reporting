@@ -14,20 +14,23 @@ export default function StandardsPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [slideOverOpen, setSlideOverOpen] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+  const [filterStandardCode, setFilterStandardCode] = useState<string | null>(null);
 
   const handleStandardSelect = useCallback((standardId: number) => {
     setSelectedStandardId(standardId);
     setDetailOpen(true);
   }, []);
 
-  const handleSelectStudents = useCallback((studentIds: number[]) => {
+  const handleSelectStudents = useCallback((studentIds: number[], standardCode: string) => {
     setSelectedStudentIds(studentIds);
+    setFilterStandardCode(standardCode);
     setDetailOpen(false);
     setSlideOverOpen(true);
   }, []);
 
   const handleAssignmentSuccess = useCallback(() => {
     setSelectedStudentIds([]);
+    setFilterStandardCode(null);
     setSlideOverOpen(false);
   }, []);
 
@@ -63,6 +66,7 @@ export default function StandardsPage() {
         onOpenChange={setSlideOverOpen}
         selectedStudentIds={selectedStudentIds}
         onSuccess={handleAssignmentSuccess}
+        filterStandardCode={filterStandardCode}
       />
     </div>
   );

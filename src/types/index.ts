@@ -122,6 +122,7 @@ export interface AssignmentListItem {
   started: number;
   completed: number;
   createdAt: string;
+  createdAfterTestId: number;
 }
 
 export interface CreateAssignmentInput {
@@ -292,4 +293,34 @@ export interface StandardStudentsResponse {
     rcName: string;
   };
   students: StandardStudentRow[];
+}
+
+// ─── Standard-Level Impact Types ────────────────────────────────────────────
+
+export interface StandardDiDResult {
+  standardId: number;
+  code: string;
+  description: string;
+  treatedCount: number;
+  treatedPreAvg: number;
+  treatedPostAvg: number;
+  treatedDelta: number;
+  controlCount: number;
+  controlPreAvg: number;
+  controlPostAvg: number;
+  controlDelta: number;
+  didImpact: number;
+  pValue: number | null;
+  isSignificant: boolean;
+}
+
+export interface StandardImpactResult {
+  assignmentId: number;
+  assignmentName: string;
+  platform: string;
+  rcName: string;
+  preTestName: string;
+  postTestName: string;
+  overallDidImpact: number;
+  standards: StandardDiDResult[];
 }

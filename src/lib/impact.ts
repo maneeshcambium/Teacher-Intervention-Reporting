@@ -1,6 +1,6 @@
 import { sqlite } from "./db";
 import { tTestTwoSample } from "simple-statistics";
-import type { ImpactResult, StudentPoint } from "@/types";
+import type { ImpactResult, StudentPoint, StandardDiDResult, StandardImpactResult } from "@/types";
 
 interface AssignmentMeta {
   id: number;
@@ -318,6 +318,211 @@ function approximatePValue(tAbs: number, df: number): number {
 
   // Two-tailed p-value
   return 2 * (1 - cdf);
+}
+
+/**
+ * Calculate per-standard DiD impact for a single assignment.
+ * Instead of averaging all aligned standards, this computes DiD independently for each standard.
+ */
+export function calculateStandardLevelImpact(
+  assignmentId: number
+): StandardImpactResult | null {
+  // 1. Get assignment metadata
+  const assignment = sqlite
+    .prepare(
+      `SELECT a.id, a.name, a.platform, a.created_after_test_id as createdAfterTestId,
+              a.impacted_test_id as impactedTestId, a.group_id as groupId,
+              COALESCE(rc.name, '') as rcName
+       FROM assignments a
+       LEFT JOIN reporting_categories rc ON rc.id = a.rc_id
+       WHERE a.id = ?`
+    )
+    .get(assignmentId) as AssignmentMeta | undefined;
+
+  if (!assignment || !assignment.impactedTestId) return null;
+
+  const preTest = sqlite
+    .prepare(`SELECT name FROM tests WHERE id = ?`)
+    .get(assignment.createdAfterTestId) as { name: string } | undefined;
+  const postTest = sqlite
+    .prepare(`SELECT name FROM tests WHERE id = ?`)
+    .get(assignment.impactedTestId) as { name: string } | undefined;
+  const preTestName = preTest?.name ?? `Test ${assignment.createdAfterTestId}`;
+  const postTestName = postTest?.name ?? `Test ${assignment.impactedTestId}`;
+
+  // 2. Get linked standards with descriptions
+  const standardRows = sqlite
+    .prepare(
+      `SELECT ast.standard_id as standardId, s.code, s.description
+       FROM assignment_standards ast
+       JOIN standards s ON s.id = ast.standard_id
+       WHERE ast.assignment_id = ?`
+    )
+    .all(assignmentId) as { standardId: number; code: string; description: string }[];
+
+  if (standardRows.length === 0) return null;
+
+  // 3. Get treated students (completed)
+  const treatedStudents = sqlite
+    .prepare(
+      `SELECT asn.student_id as studentId, st.roster_id as rosterId
+       FROM assignment_students asn
+       JOIN students st ON st.id = asn.student_id
+       WHERE asn.assignment_id = ? AND asn.status = 'completed'`
+    )
+    .all(assignmentId) as TreatedStudentRow[];
+
+  const treatedStudentIds = treatedStudents.map((s) => s.studentId);
+  const rosterIds = [...new Set(treatedStudents.map((s) => s.rosterId))];
+
+  // 4. Get control students (same roster, not assigned)
+  const allAssignedRows = sqlite
+    .prepare(
+      `SELECT student_id as studentId FROM assignment_students WHERE assignment_id = ?`
+    )
+    .all(assignmentId) as { studentId: number }[];
+  const allAssignedIds = new Set(allAssignedRows.map((r) => r.studentId));
+
+  const controlStudentIds: number[] = [];
+  if (rosterIds.length > 0) {
+    const rosterPlaceholders = rosterIds.map(() => "?").join(",");
+    const controlStudents = sqlite
+      .prepare(
+        `SELECT id as studentId FROM students WHERE roster_id IN (${rosterPlaceholders})`
+      )
+      .all(...rosterIds) as { studentId: number }[];
+    for (const s of controlStudents) {
+      if (!allAssignedIds.has(s.studentId)) {
+        controlStudentIds.push(s.studentId);
+      }
+    }
+  }
+
+  // 5. Load all std_scores for treated and control on pre and post tests
+  function getStdScoresMap(
+    studentIds: number[],
+    testId: number
+  ): Map<number, Record<string, number>> {
+    if (studentIds.length === 0) return new Map();
+    const placeholders = studentIds.map(() => "?").join(",");
+    const rows = sqlite
+      .prepare(
+        `SELECT student_id as studentId, std_scores as stdScores
+         FROM scores
+         WHERE student_id IN (${placeholders}) AND test_id = ?`
+      )
+      .all(...studentIds, testId) as { studentId: number; stdScores: string }[];
+    const map = new Map<number, Record<string, number>>();
+    for (const r of rows) {
+      try {
+        map.set(r.studentId, JSON.parse(r.stdScores));
+      } catch {
+        // skip invalid JSON
+      }
+    }
+    return map;
+  }
+
+  const preTestId = assignment.createdAfterTestId;
+  const postTestId = assignment.impactedTestId;
+
+  const treatedPre = getStdScoresMap(treatedStudentIds, preTestId);
+  const treatedPost = getStdScoresMap(treatedStudentIds, postTestId);
+  const controlPre = getStdScoresMap(controlStudentIds, preTestId);
+  const controlPost = getStdScoresMap(controlStudentIds, postTestId);
+
+  // 6. Get overall DiD for context
+  const overallImpact = calculateAssignmentImpact(assignmentId, false);
+
+  // 7. Compute per-standard DiD
+  const standardResults: StandardDiDResult[] = standardRows.map((std) => {
+    const sid = String(std.standardId);
+
+    // Treated gains for this standard
+    const treatedGains: number[] = [];
+    const treatedPreVals: number[] = [];
+    const treatedPostVals: number[] = [];
+    for (const studentId of treatedStudentIds) {
+      const pre = treatedPre.get(studentId)?.[sid];
+      const post = treatedPost.get(studentId)?.[sid];
+      if (pre != null && post != null) {
+        treatedPreVals.push(pre);
+        treatedPostVals.push(post);
+        treatedGains.push(post - pre);
+      }
+    }
+
+    // Control gains for this standard
+    const controlGains: number[] = [];
+    const controlPreVals: number[] = [];
+    const controlPostVals: number[] = [];
+    for (const studentId of controlStudentIds) {
+      const pre = controlPre.get(studentId)?.[sid];
+      const post = controlPost.get(studentId)?.[sid];
+      if (pre != null && post != null) {
+        controlPreVals.push(pre);
+        controlPostVals.push(post);
+        controlGains.push(post - pre);
+      }
+    }
+
+    const treatedPreAvg = mean(treatedPreVals);
+    const treatedPostAvg = mean(treatedPostVals);
+    const treatedDelta = treatedPostAvg - treatedPreAvg;
+
+    const controlPreAvg = mean(controlPreVals);
+    const controlPostAvg = mean(controlPostVals);
+    const controlDelta = controlPostAvg - controlPreAvg;
+
+    const didImpact = treatedDelta - controlDelta;
+
+    // t-test on gains
+    let pValue: number | null = null;
+    let isSignificant = false;
+    if (treatedGains.length >= 2 && controlGains.length >= 2) {
+      try {
+        const tStat = tTestTwoSample(treatedGains, controlGains);
+        if (tStat != null) {
+          const df = treatedGains.length + controlGains.length - 2;
+          pValue = approximatePValue(Math.abs(tStat), df);
+          isSignificant = pValue < 0.05;
+        }
+      } catch {
+        pValue = null;
+      }
+    }
+
+    return {
+      standardId: std.standardId,
+      code: std.code,
+      description: std.description,
+      treatedCount: treatedGains.length,
+      treatedPreAvg: Math.round(treatedPreAvg),
+      treatedPostAvg: Math.round(treatedPostAvg),
+      treatedDelta: Math.round(treatedDelta),
+      controlCount: controlGains.length,
+      controlPreAvg: Math.round(controlPreAvg),
+      controlPostAvg: Math.round(controlPostAvg),
+      controlDelta: Math.round(controlDelta),
+      didImpact: Math.round(didImpact),
+      pValue: pValue != null ? Math.round(pValue * 1000) / 1000 : null,
+      isSignificant,
+    };
+  });
+
+  // Sort by didImpact descending
+  standardResults.sort((a, b) => b.didImpact - a.didImpact);
+
+  return {
+    assignmentId: assignment.id,
+    assignmentName: assignment.name,
+    platform: assignment.platform,
+    rcName: assignment.rcName,
+    preTestName,
+    postTestName,
+    overallDidImpact: overallImpact?.didImpact ?? 0,
+    standards: standardResults,
+  };
 }
 
 /**

@@ -25,7 +25,7 @@ interface StandardDetailPanelProps {
   standardId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelectStudents: (studentIds: number[]) => void;
+  onSelectStudents: (studentIds: number[], standardCode: string) => void;
 }
 
 export function StandardDetailPanel({
@@ -62,11 +62,13 @@ export function StandardDetailPanel({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         {isLoading ? (
-          <div className="space-y-4 pt-6">
-            <Skeleton className="h-6 w-48" />
+          <SheetHeader>
+            <SheetTitle>
+              <Skeleton className="h-6 w-48" />
+            </SheetTitle>
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-32 w-full" />
-          </div>
+          </SheetHeader>
         ) : data ? (
           <>
             <SheetHeader>
@@ -118,11 +120,15 @@ export function StandardDetailPanel({
               {/* Student list */}
               <StandardStudentList
                 students={data.students}
-                onSelectStudents={onSelectStudents}
+                onSelectStudents={(ids) => onSelectStudents(ids, data.standard.code)}
               />
             </div>
           </>
-        ) : null}
+        ) : (
+          <SheetHeader>
+            <SheetTitle>Standard Detail</SheetTitle>
+          </SheetHeader>
+        )}
       </SheetContent>
     </Sheet>
   );

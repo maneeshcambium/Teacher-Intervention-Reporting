@@ -273,6 +273,7 @@ export function getAssignments(groupId: number): AssignmentListItem[] {
         a.name,
         a.platform,
         a.created_at as createdAt,
+        a.created_after_test_id as createdAfterTestId,
         rc.name as rcName,
         (SELECT GROUP_CONCAT(std.code)
          FROM assignment_standards ast
@@ -293,6 +294,7 @@ export function getAssignments(groupId: number): AssignmentListItem[] {
     name: string;
     platform: string;
     createdAt: string;
+    createdAfterTestId: number;
     rcName: string | null;
     standardCodes: string | null;
     totalStudents: number;
@@ -312,6 +314,7 @@ export function getAssignments(groupId: number): AssignmentListItem[] {
     started: r.started,
     completed: r.completed,
     createdAt: r.createdAt,
+    createdAfterTestId: r.createdAfterTestId,
   }));
 }
 
@@ -369,6 +372,33 @@ export function deleteAssignment(id: number): void {
     sqlite.prepare("DELETE FROM assignment_standards WHERE assignment_id = ?").run(id);
     sqlite.prepare("DELETE FROM assignments WHERE id = ?").run(id);
   })();
+}
+
+export function addStudentsToAssignment(
+  assignmentId: number,
+  studentIds: number[]
+): { added: number } {
+  const result = sqlite.transaction(() => {
+    // Only insert students not already assigned
+    const check = sqlite.prepare(
+      `SELECT 1 FROM assignment_students WHERE assignment_id = ? AND student_id = ?`
+    );
+    const insert = sqlite.prepare(
+      `INSERT INTO assignment_students (assignment_id, student_id, status) VALUES (?, ?, 'not_started')`
+    );
+
+    let added = 0;
+    for (const studentId of studentIds) {
+      const existing = check.get(assignmentId, studentId);
+      if (!existing) {
+        insert.run(assignmentId, studentId);
+        added++;
+      }
+    }
+    return { added };
+  })();
+
+  return result;
 }
 
 // ─── Student Detail ────────────────────────────────────────────────────────

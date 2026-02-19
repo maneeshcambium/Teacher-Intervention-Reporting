@@ -5,10 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppContext } from "@/hooks/useAppContext";
 import { useImpactSummary, useAssignmentImpact } from "@/hooks/useImpact";
+import { useStandardImpact } from "@/hooks/useStandardImpact";
 import { ImpactCards } from "@/components/impact/ImpactCard";
 import { ScatterPlot } from "@/components/impact/ScatterPlot";
 import { ImpactTable } from "@/components/impact/ImpactTable";
 import { ImpactInfoDialog } from "@/components/impact/ImpactInfoDialog";
+import { StandardImpactBreakdown } from "@/components/impact/StandardImpactBreakdown";
 
 export default function ImpactPage() {
   const { selectedTestGroupId } = useAppContext();
@@ -19,6 +21,10 @@ export default function ImpactPage() {
   );
 
   const { data: selectedImpact, isLoading: detailLoading } = useAssignmentImpact(
+    selectedAssignmentId
+  );
+
+  const { data: standardImpact, isLoading: standardImpactLoading } = useStandardImpact(
     selectedAssignmentId
   );
 
@@ -83,6 +89,13 @@ export default function ImpactPage() {
           onSelect={setSelectedAssignmentId}
         />
       </div>
+
+      {selectedAssignmentId && (
+        <StandardImpactBreakdown
+          data={standardImpact ?? null}
+          isLoading={standardImpactLoading}
+        />
+      )}
     </div>
   );
 }
