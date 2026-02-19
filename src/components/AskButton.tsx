@@ -1,23 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { AskPanel } from "@/components/AskPanel";
-import { Sparkles } from "lucide-react";
+import Image from "next/image";
 
 export function AskButton() {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button
+      <button
         onClick={() => setOpen(true)}
-        size="sm"
-        className="fixed bottom-6 right-6 z-40 rounded-full h-12 w-12 p-0 shadow-lg bg-blue-600 hover:bg-blue-700 text-white"
-        aria-label="Ask about your class"
+        className="fixed bottom-6 right-6 z-40 rounded-full px-4 py-2 shadow-lg bg-white hover:bg-gray-50 border border-gray-200 transition-colors flex items-center gap-2"
+        aria-label="Ask Cambi"
       >
-        <Sparkles className="h-5 w-5" />
-      </Button>
+        <Image
+          src="/cambi.png"
+          alt="Ask Cambi"
+          width={28}
+          height={28}
+          className="rounded-full"
+        />
+        <span className="text-sm font-medium text-gray-700">Ask Cambi</span>
+      </button>
       <AskPanel open={open} onOpenChange={setOpen} />
     </>
   );

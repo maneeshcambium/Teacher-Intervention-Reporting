@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addStudentsToAssignment } from "@/lib/queries";
+import { addStudentsToAssignment, getAssignmentStudents } from "@/lib/queries";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const assignmentId = Number(id);
+    if (isNaN(assignmentId)) {
+      return NextResponse.json({ error: "Invalid assignment ID" }, { status: 400 });
+    }
+    const students = getAssignmentStudents(assignmentId);
+    return NextResponse.json(students);
+  } catch (error) {
+    console.error("Failed to fetch assignment students:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch assignment students" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(
   request: NextRequest,

@@ -145,6 +145,14 @@ export interface CreateAssignmentResponse {
   createdAt: string;
 }
 
+// ─── Assignment Student List ────────────────────────────────────────────────
+
+export interface AssignmentStudentRow {
+  studentId: number;
+  studentName: string;
+  status: string;
+}
+
 // ─── Impact Analysis Types ──────────────────────────────────────────────────
 
 export interface StudentPoint {

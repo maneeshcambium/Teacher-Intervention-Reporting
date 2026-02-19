@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2, Loader2, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
+import { AssignmentStudentsPanel } from "@/components/dashboard/AssignmentStudentsPanel";
 import type { AssignmentListItem } from "@/types";
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -52,6 +53,7 @@ export function AssignmentSummary() {
   const { data: assignments, isLoading } = useAssignments(selectedTestGroupId);
   const deleteMutation = useDeleteAssignment();
   const [deleteTarget, setDeleteTarget] = useState<AssignmentListItem | null>(null);
+  const [viewStudents, setViewStudents] = useState<AssignmentListItem | null>(null);
 
   const handleDelete = () => {
     if (!deleteTarget) return;
@@ -111,6 +113,7 @@ export function AssignmentSummary() {
                       key={assignment.id}
                       assignment={assignment}
                       onDelete={() => setDeleteTarget(assignment)}
+                      onClick={() => setViewStudents(assignment)}
                     />
                   ))}
                 </TableBody>
@@ -119,6 +122,12 @@ export function AssignmentSummary() {
           )}
         </CardContent>
       </Card>
+
+      <AssignmentStudentsPanel
+        assignment={viewStudents}
+        open={!!viewStudents}
+        onOpenChange={(open) => !open && setViewStudents(null)}
+      />
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
@@ -183,9 +192,11 @@ function StatusCell({
 function AssignmentRow({
   assignment,
   onDelete,
+  onClick,
 }: {
   assignment: AssignmentListItem;
   onDelete: () => void;
+  onClick: () => void;
 }) {
   const platformClass = PLATFORM_COLORS[assignment.platform] || "bg-gray-100 text-gray-800";
   const platformLabel = PLATFORM_LABELS[assignment.platform] || assignment.platform;
@@ -194,7 +205,7 @@ function AssignmentRow({
   const extraCount = assignment.standards.length - 3;
 
   return (
-    <TableRow>
+    <TableRow className="cursor-pointer hover:bg-muted/50" onClick={onClick}>
       <TableCell className="font-medium">{assignment.name}</TableCell>
       <TableCell>
         <Badge variant="outline" className={platformClass}>
@@ -235,7 +246,7 @@ function AssignmentRow({
       <StatusCell count={assignment.started} total={assignment.totalStudents} color="#EAB308" />
       <StatusCell count={assignment.completed} total={assignment.totalStudents} color="#22C55E" />
       <TableCell>
-        <Button variant="ghost" size="icon" onClick={onDelete} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="h-8 w-8 text-muted-foreground hover:text-destructive">
           <Trash2 className="h-4 w-4" />
         </Button>
       </TableCell>

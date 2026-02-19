@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import Image from "next/image";
 import {
   Sheet,
   SheetContent,
@@ -34,7 +35,6 @@ import {
   Award,
   Loader2,
   Trash2,
-  Sparkles,
   Send,
   Bot,
   Zap,
@@ -301,8 +301,14 @@ export function AskPanel({ open, onOpenChange }: AskPanelProps) {
         <SheetHeader className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-blue-500" />
-              <SheetTitle>Ask About Your Class</SheetTitle>
+              <Image
+                src="/cambi.png"
+                alt="Cambi"
+                width={24}
+                height={24}
+                className="rounded-full"
+              />
+              <SheetTitle>Ask Cambi</SheetTitle>
             </div>
           </div>
           <SheetDescription>

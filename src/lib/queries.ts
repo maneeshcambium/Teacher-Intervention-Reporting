@@ -404,6 +404,17 @@ export function addStudentsToAssignment(
   return result;
 }
 
+export function getAssignmentStudents(assignmentId: number): { studentId: number; studentName: string; status: string }[] {
+  const rows = sqlite.prepare(
+    `SELECT s.id as studentId, s.name as studentName, asn.status
+     FROM assignment_students asn
+     JOIN students s ON s.id = asn.student_id
+     WHERE asn.assignment_id = ?
+     ORDER BY s.name`
+  ).all(assignmentId) as { studentId: number; studentName: string; status: string }[];
+  return rows;
+}
+
 // ─── Student Detail ────────────────────────────────────────────────────────
 
 export function getStudentDetail(studentId: number): StudentDetail | null {
