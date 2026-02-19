@@ -7,6 +7,11 @@
         "--db-path",
         "D:\\Code\\Experiments\\TeacherAssignments\\data\\teacher-dashboard.db"
       ]
+    },
+    "teacher-dashboard": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp/server.ts"],
+      "cwd": "${workspaceFolder}"
     }
   }
 }
